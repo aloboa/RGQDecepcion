@@ -1,5 +1,7 @@
-Discriminant Analysis of Geochemical composition vs. Eruption Phase (Decepcion Is., Smellie 2001)
-============================================================================================
+Discriminant Analysis of Geochemical composition vs. Eruption Phase (I)
+========================================================================
+Decepcion Island (Smellie 2001)
+-------------------------------
 * Agustin.Lobo@ictja.csic.es
 * Data by ageyertraver@gmail.com
 * 20160720
@@ -16,6 +18,7 @@ require(reshape2)
 require(plyr)
 require(scales)
 require(robCompositions)
+require(subselect)
 
 rwd <- "/media/alobo/LACIE500/Adelina/GQDecepcion/RGQDecepcion"
 dirdata1 <- "/media/alobo/LACIE500/Adelina/GQDecepcion/GQDecepcionData"
@@ -273,13 +276,14 @@ smelliecen.lda <- lda(prcomp(smelliecen[,6:16])$x, grouping=smelliecen$Phase)
 ```r
 smelliecen.lda <- lda(prcomp(smelliecen[,6:16])$x[,-11], grouping=smelliecen$Phase)
 smelliecen.ldaclas <- predict(smelliecen.lda)$class
+smelliecen.ldc <- predict(smelliecen.lda)$x
 colorines <- as.character(mapvalues(smelliecen.ldaclas,from=c("pre","syn","post"),
                        to=c("green","red","blue")))
 ```
 
 ```r
-plot(predict(smelliecen.lda)$x, type="n", ,main="LDA Plot")
-text(predict(smelliecen.lda)$x,col=colorines, labels =smelliecen$Phase, cex=0.75)
+plot(smelliecen.ldc, type="n", ,main="LDA Plot")
+text(smelliecen.ldc,col=colorines, labels =smelliecen$Phase, cex=0.75)
 legend("topright",title="Predicted Phases",title.col="black",legend=c("pre","syn","post"),text.col=c("green","red","blue"),bty="o",cex=0.75)
 ```
 
@@ -293,8 +297,8 @@ Labels refer to observed eruptive phases, while colors refer to LDA-predicted er
 
 
 ```r
-plot(predict(smelliecen.lda)$x,col=colorines,pch=" ",main="LDA Plot")
-text(predict(smelliecen.lda)$x,col=colorines, labels =smelliecen$Sample, cex=0.75)
+plot(smelliecen.ldc,col=colorines,pch=" ",main="LDA Plot")
+text(smelliecen.ldc,col=colorines, labels =smelliecen$Sample, cex=0.75)
 legend("topright",title="Predicted Phases",title.col="black",legend=c("pre","syn","post"), pch=19,col=c("green","red","blue"),bty="o",cex=0.75)
 ```
 
@@ -353,3 +357,74 @@ summary(manova(prcomp(smelliecen[,6:16])$x[,-11]~ smelliecen$Phase),test="Wilks"
 ```
 
 **Phase groups significantly differ in terms of Geochemical composition**
+
+## 4. Selection of variables
+
+
+```r
+smelliecenHmat <- ldaHmat(smelliecen[,-(1:5)], grouping=smelliecen$Phase)
+smelliecen.eleaps <- eleaps(smelliecenHmat$mat,kmin=2,kmax=10,H=smelliecenHmat$H,r=smelliecenHmat$r,crit="tau2",timelimit=15)
+smelliecen.eleaps
+```
+
+Plot of quality of subsets
+
+
+```r
+par(mfrow=c(1,2))
+plot(2:10,smelliecen.eleaps$bestvalues,xlab="Nb. of variables", ylab="Tau2 value")
+plot(3:10,diff(smelliecen.eleaps$bestvalues)*100/smelliecen.eleaps$bestvalues[-9],
+     xlab="Nb. of variables", ylab="Delta of Tau2")
+```
+
+![plot of chunk unnamed-chunk-13](figure/smellie-unnamed-chunk-13-1.png) 
+
+Table of subsets
+
+
+```r
+options(width=180)
+subsets <- smelliecen.eleaps$bestsets
+subsets[subsets==0] <- NA
+subsets2 <- names(smelliecen)[subsets+5]
+dim(subsets2) <- dim(subsets)
+colnames(subsets2) <- colnames(subsets)
+subsets2
+```
+
+```
+##       Var.1   Var.2   Var.3   Var.4   Var.5  Var.6  Var.7  Var.8  Var.9  Var.10
+##  [1,] "Fe2O3" "P2O5"  NA      NA      NA     NA     NA     NA     NA     NA    
+##  [2,] "MnO"   "K2O"   "P2O5"  NA      NA     NA     NA     NA     NA     NA    
+##  [3,] "sio2"  "Al2o3" "Na2O"  "K2O"   NA     NA     NA     NA     NA     NA    
+##  [4,] "sio2"  "Al2o3" "Na2O"  "K2O"   "P2O5" NA     NA     NA     NA     NA    
+##  [5,] "sio2"  "Al2o3" "Fe2O3" "Na2O"  "K2O"  "P2O5" NA     NA     NA     NA    
+##  [6,] "sio2"  "Al2o3" "Fe2O3" "MnO"   "Na2O" "K2O"  "P2O5" NA     NA     NA    
+##  [7,] "sio2"  "tio2"  "Al2o3" "Fe2O3" "MnO"  "Na2O" "K2O"  "P2O5" NA     NA    
+##  [8,] "sio2"  "Al2o3" "Fe2O3" "MgO"   "CaO"  "Na2O" "K2O"  "P2O5" "Loi"  NA    
+##  [9,] "tio2"  "Al2o3" "Fe2O3" "MnO"   "MgO"  "CaO"  "Na2O" "K2O"  "P2O5" "Loi"
+```
+
+```r
+options(width=80)
+```
+
+```r
+ggplot(data=data.frame(smelliecen.ldc,Phase=smelliecen$Phase)) +
+    geom_text(aes(x=LD1,y=LD2,label=Phase,col=Phase),size=3) +
+    ggtitle("LDA with all variables")
+for(i in c(5,7,10)){
+    selvar <- smelliecen.eleaps$bestsets[i-1,]
+    selvar <- selvar[selvar!=0]+5
+    delme <- paste(names(smelliecen)[selvar], collapse=" ")
+    smelliecensub.lda <- lda(smelliecen[,selvar],grouping=smelliecen$Phase)
+    smelliecensub.ldc <- data.matrix(predict(smelliecensub.lda)$x)
+    smelliecensub.ldc <- data.frame(smelliecen[,1:5],smelliecensub.ldc)
+    print(ggplot(data=smelliecensub.ldc) +
+              geom_text(aes(x=LD1,y=LD2,label=Phase,col=Phase),size=3) +
+              ggtitle(paste("LDA with", delme)))
+}
+```
+
+<img src="figure/smellie-unnamed-chunk-15-1.png" title="plot of chunk unnamed-chunk-15" alt="plot of chunk unnamed-chunk-15" width="50%" /><img src="figure/smellie-unnamed-chunk-15-2.png" title="plot of chunk unnamed-chunk-15" alt="plot of chunk unnamed-chunk-15" width="50%" /><img src="figure/smellie-unnamed-chunk-15-3.png" title="plot of chunk unnamed-chunk-15" alt="plot of chunk unnamed-chunk-15" width="50%" /><img src="figure/smellie-unnamed-chunk-15-4.png" title="plot of chunk unnamed-chunk-15" alt="plot of chunk unnamed-chunk-15" width="50%" />
+
